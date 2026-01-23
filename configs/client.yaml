@@ -1,0 +1,24 @@
+# Go-Tunnel-Lite 客户端配置
+
+client:
+  # 服务端地址
+  server_addr: "127.0.0.1:7000"
+  # 认证令牌，需要与服务端配置一致
+  token: "my-secret-token"
+  # 心跳间隔
+  heartbeat_interval: 30s
+  # 隧道配置列表
+  tunnels:
+    # Web 服务隧道
+    - name: "web"
+      local_addr: "127.0.0.1:8080"   # 本地 Web 服务地址
+      remote_port: 8080               # 远程暴露端口
+    # SSH 隧道
+    - name: "ssh"
+      local_addr: "127.0.0.1:22"
+      remote_port: 2222
+log:
+  # 日志级别: debug, info, warn, error
+  level: "info"
+  # 日志文件路径，为空则输出到控制台
+  file: ""

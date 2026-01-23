@@ -1,0 +1,20 @@
+# Go-Tunnel-Lite 服务端配置
+
+server:
+  # 控制端口地址，客户端连接此端口
+  control_addr: "0.0.0.0:7000"
+  # 认证令牌，需要与客户端配置一致
+  token: "my-secret-token"
+  # 心跳间隔（秒）
+  heartbeat_interval: 30s
+  # 心跳超时（秒），超过此时间未收到心跳则断开连接
+  heartbeat_timeout: 90s
+  # 允许客户端使用的公共端口白名单（为空则允许所有端口）
+  public_ports:
+    - 8080  # Web 服务
+    - 2222  # SSH 服务
+log:
+  # 日志级别: debug, info, warn, error
+  level: "info"
+  # 日志文件路径，为空则输出到控制台
+  file: ""
