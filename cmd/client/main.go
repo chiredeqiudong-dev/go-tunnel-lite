@@ -32,7 +32,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 初始化日志
 	log.Info("========================================")
 	log.Info("  Go-Tunnel-Lite Client 启动中...")
 	log.Info("========================================")
@@ -61,7 +60,6 @@ func main() {
 
 	// 优雅关闭
 	cli.Stop()
-
 	log.Info("客户端已关闭")
 }
 

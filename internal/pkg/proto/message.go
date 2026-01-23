@@ -14,13 +14,13 @@ Message 结构体、编解码方法
 +------+--------+---------+
 */
 
-// Message 结构体
+// Message
 type Message struct {
 	Type uint8
 	Data []byte
 }
 
-// 编码
+// 对 Message 按照已经定义好的协议进行编码
 func (m *Message) WriteTo(w io.Writer) (n int64, err error) {
 	// 检查消息长度
 	dataLen := len(m.Data)
@@ -30,7 +30,7 @@ func (m *Message) WriteTo(w io.Writer) (n int64, err error) {
 
 	// 构造消息头
 	header := make([]byte, HeaderLen)
-	// 第1字节 数据类型，2-5字节数据长度（大端序）
+	// 第1字节 数据类型，2-5字节 数据长度（大端序）
 	header[0] = m.Type
 	binary.BigEndian.PutUint32(header[1:5], uint32(dataLen))
 
@@ -54,7 +54,7 @@ func (m *Message) WriteTo(w io.Writer) (n int64, err error) {
 	return n, nil
 }
 
-// 解码
+// 对 Message 按照已经定义好的协议进行解码
 func (m *Message) ReadFrom(r io.Reader) (n int64, err error) {
 	// 读取消息头
 	header := make([]byte, HeaderLen)

@@ -55,7 +55,6 @@ func (c *Connect) WriteMessage(msg *proto.Message) error {
 
 	// 编码
 	_, err := msg.WriteTo(c.conn)
-
 	return err
 }
 

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -60,7 +61,7 @@ func (s *mockServer) handleConnection(conn net.Conn, authSuccess bool, tunnelSuc
 		return
 	}
 
-	authReq, err := proto.DecodeAuthRequest(msg.Data)
+	authReq, err := proto.Decode[proto.AuthRequest](msg.Data)
 	if err != nil {
 		s.t.Logf("解码认证请求失败: %v", err)
 		return
@@ -74,7 +75,7 @@ func (s *mockServer) handleConnection(conn net.Conn, authSuccess bool, tunnelSuc
 		authResp = &proto.AuthResponse{Success: false, Message: "token无效"}
 	}
 
-	respData, _ := proto.EncodeAuthResponse(authResp)
+	respData, _ := proto.Encode(authResp)
 	respMsg := &proto.Message{Type: proto.TypeAuthResp, Data: respData}
 	if err := c.WriteMessage(respMsg); err != nil {
 		s.t.Logf("发送认证响应失败: %v", err)
@@ -94,7 +95,7 @@ func (s *mockServer) handleConnection(conn net.Conn, authSuccess bool, tunnelSuc
 
 		switch msg.Type {
 		case proto.TypeRegisterTunnel:
-			tunnelReq, _ := proto.DecodeRegisterTunnelRequest(msg.Data)
+			tunnelReq, _ := proto.Decode[proto.RegisterTunnelRequest](msg.Data)
 			var tunnelResp *proto.RegisterTunnelResponse
 			if tunnelSuccess {
 				tunnelResp = &proto.RegisterTunnelResponse{
@@ -109,7 +110,7 @@ func (s *mockServer) handleConnection(conn net.Conn, authSuccess bool, tunnelSuc
 					Message: "端口已被占用",
 				}
 			}
-			respData, _ := proto.EncodeRegisterTunnelResponse(tunnelResp)
+			respData, _ := proto.Encode(tunnelResp)
 			c.WriteMessage(&proto.Message{Type: proto.TypeRegisterTunnelResp, Data: respData})
 
 			if !tunnelSuccess {
@@ -354,7 +355,7 @@ func TestClientHeartbeat(t *testing.T) {
 		// 处理认证
 		msg, _ := c.ReadMessage()
 		if msg.Type == proto.TypeAuth {
-			respData, _ := proto.EncodeAuthResponse(&proto.AuthResponse{Success: true})
+			respData, _ := proto.Encode(&proto.AuthResponse{Success: true})
 			c.WriteMessage(&proto.Message{Type: proto.TypeAuthResp, Data: respData})
 		}
 
@@ -367,8 +368,8 @@ func TestClientHeartbeat(t *testing.T) {
 
 			switch msg.Type {
 			case proto.TypeRegisterTunnel:
-				tunnelReq, _ := proto.DecodeRegisterTunnelRequest(msg.Data)
-				respData, _ := proto.EncodeRegisterTunnelResponse(&proto.RegisterTunnelResponse{
+				tunnelReq, _ := proto.Decode[proto.RegisterTunnelRequest](msg.Data)
+				respData, _ := proto.Encode(&proto.RegisterTunnelResponse{
 					Success:    true,
 					TunnelName: tunnelReq.Tunnel.Name,
 					RemotePort: tunnelReq.Tunnel.RemotePort,
@@ -419,9 +420,9 @@ func TestClientHeartbeat(t *testing.T) {
 
 // TestGenerateClientID 测试客户端ID生成
 func TestGenerateClientID(t *testing.T) {
-	id1 := generateClientID()
+	id1 := fmt.Sprintf("client-%d", time.Now().UnixNano())
 	time.Sleep(time.Nanosecond)
-	id2 := generateClientID()
+	id2 := fmt.Sprintf("client-%d", time.Now().UnixNano())
 
 	if id1 == "" {
 		t.Error("生成的ID为空")

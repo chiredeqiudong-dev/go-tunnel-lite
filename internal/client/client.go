@@ -41,28 +41,28 @@ func (c *Client) Start() error {
 	c.running = true
 	c.mu.Unlock()
 
-	// 1. 连接服务端
+	// 连接服务端
 	if err := c.connect(); err != nil {
 		return err
 	}
 
-	// 2. 认证
+	// 认证
 	if err := c.authenticate(); err != nil {
 		c.conn.Close()
 		return err
 	}
 
-	// 3. 注册隧道
+	// 注册隧道
 	if err := c.registerTunnels(); err != nil {
 		c.conn.Close()
 		return err
 	}
 
-	// 4. 启动消息处理循环
+	// 启动消息处理循环
 	c.wg.Add(1)
 	go c.messageLoop()
 
-	// 5. 启动心跳
+	// 启动心跳
 	c.wg.Add(1)
 	go c.heartbeatLoop()
 
@@ -115,21 +115,19 @@ func (c *Client) authenticate() error {
 	// 构造认证请求
 	authReq := &proto.AuthRequest{
 		Token:    c.cfg.Client.Token,
-		ClientID: generateClientID(), // 生成唯一客户端ID
-		Version:  "1.0.0",
+		ClientID: fmt.Sprintf("client-%d", time.Now().UnixNano()),
+		Version:  "1.0.0", // 用处？
 	}
 
 	// 编码并发送
-	data, err := proto.EncodeAuthRequest(authReq)
+	data, err := proto.Encode(authReq)
 	if err != nil {
 		return fmt.Errorf("编码认证请求失败: %w", err)
 	}
-
 	msg := &proto.Message{
 		Type: proto.TypeAuth,
 		Data: data,
 	}
-
 	if err := c.conn.WriteMessage(msg); err != nil {
 		return fmt.Errorf("发送认证请求失败: %w", err)
 	}
@@ -139,17 +137,15 @@ func (c *Client) authenticate() error {
 	if err != nil {
 		return fmt.Errorf("读取认证响应失败: %w", err)
 	}
-
 	if respMsg.Type != proto.TypeAuthResp {
 		return fmt.Errorf("期望认证响应，收到: %s", proto.GetTypeName(respMsg.Type))
 	}
 
 	// 解码认证响应
-	authResp, err := proto.DecodeAuthResponse(respMsg.Data)
+	authResp, err := proto.Decode[proto.AuthResponse](respMsg.Data)
 	if err != nil {
 		return fmt.Errorf("解码认证响应失败: %w", err)
 	}
-
 	if !authResp.Success {
 		return fmt.Errorf("认证失败: %s", authResp.Message)
 	}
@@ -183,7 +179,7 @@ func (c *Client) registerTunnel(tunnel config.TunnelConfig) error {
 	}
 
 	// 编码并发送
-	data, err := proto.EncodeRegisterTunnelRequest(req)
+	data, err := proto.Encode(req)
 	if err != nil {
 		return fmt.Errorf("编码隧道注册请求失败: %w", err)
 	}
@@ -208,7 +204,7 @@ func (c *Client) registerTunnel(tunnel config.TunnelConfig) error {
 	}
 
 	// 解码响应
-	resp, err := proto.DecodeRegisterTunnelResponse(respMsg.Data)
+	resp, err := proto.Decode[proto.RegisterTunnelResponse](respMsg.Data)
 	if err != nil {
 		return fmt.Errorf("解码隧道注册响应失败: %w", err)
 	}
@@ -274,7 +270,7 @@ func (c *Client) handleMessage(msg *proto.Message) {
 
 	case proto.TypeNewProxy:
 		// 解码新连接请求
-		req, err := proto.DecodeNewProxyRequest(msg.Data)
+		req, err := proto.Decode[proto.NewProxyRequest](msg.Data)
 		if err != nil {
 			log.Error("解码新连接请求失败", "error", err)
 			return
@@ -326,7 +322,7 @@ func (c *Client) handleNewProxy(req *proto.NewProxyRequest) {
 	readyReq := &proto.ProxyReadyRequest{
 		ProxyID: req.ProxyID,
 	}
-	data, _ := proto.EncodeProxyReadyRequest(readyReq)
+	data, _ := proto.Encode(readyReq)
 	readyMsg := &proto.Message{
 		Type: proto.TypeProxyReady,
 		Data: data,
@@ -407,9 +403,4 @@ func (c *Client) sendHeartbeat() error {
 		Data: nil,
 	}
 	return c.conn.WriteMessage(msg)
-}
-
-// generateClientID 生成唯一的客户端ID
-func generateClientID() string {
-	return fmt.Sprintf("client-%d", time.Now().UnixNano())
 }

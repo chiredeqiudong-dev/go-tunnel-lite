@@ -19,7 +19,7 @@ import (
 4. 心跳检测
 */
 
-// 服务端主结构
+// 服务端
 type Server struct {
 	cfg *config.ServerConfig
 
@@ -143,7 +143,7 @@ func (s *Server) handleNewConnection(rawConn net.Conn) {
 	}
 
 	// 解析认证信息
-	authReq, err := proto.DecodeAuthRequest(msg.Data)
+	authReq, err := proto.Decode[proto.AuthRequest](msg.Data)
 	if err != nil {
 		log.Warn("解析认证消息失败", "remoteAddr", remoteAddr, "error", err)
 		s.sendAuthResponse(connect, false, "认证消息格式错误")
@@ -264,7 +264,7 @@ func (s *Server) handleMessage(session *ClientSession, msg *proto.Message) {
 // handleRegisterTunnel 处理隧道注册请求
 func (s *Server) handleRegisterTunnel(session *ClientSession, msg *proto.Message) {
 	// 解码请求
-	req, err := proto.DecodeRegisterTunnelRequest(msg.Data)
+	req, err := proto.Decode[proto.RegisterTunnelRequest](msg.Data)
 	if err != nil {
 		log.Error("解码隧道注册请求失败", "clientID", session.clientID, "error", err)
 		s.sendRegisterTunnelResponse(session, false, "请求格式错误", 0)
@@ -311,7 +311,7 @@ func (s *Server) sendRegisterTunnelResponse(session *ClientSession, success bool
 		Message:    message,
 		RemotePort: remotePort,
 	}
-	data, _ := proto.EncodeRegisterTunnelResponse(resp)
+	data, _ := proto.Encode(resp)
 	msg := &proto.Message{
 		Type: proto.TypeRegisterTunnelResp,
 		Data: data,
@@ -359,7 +359,7 @@ func (s *Server) sendAuthResponse(conn *connect.Connect, success bool, message s
 		Success: success,
 		Message: message,
 	}
-	data, _ := proto.EncodeAuthResponse(resp)
+	data, _ := proto.Encode(resp)
 	msg := &proto.Message{
 		Type: proto.TypeAuthResp,
 		Data: data,

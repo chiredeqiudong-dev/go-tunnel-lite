@@ -75,7 +75,7 @@ func TestClientAuth(t *testing.T) {
 		ClientID: "test-client",
 		Token:    "test-token",
 	}
-	data, _ := proto.EncodeAuthRequest(authReq)
+	data, _ := proto.Encode(authReq)
 	msg := &proto.Message{
 		Type: proto.TypeAuth,
 		Data: data,
@@ -94,7 +94,7 @@ func TestClientAuth(t *testing.T) {
 		t.Fatalf("期望 TypeAuthResp，收到: %d", respMsg.Type)
 	}
 
-	authResp, err := proto.DecodeAuthResponse(respMsg.Data)
+	authResp, err := proto.Decode[proto.AuthResponse](respMsg.Data)
 	if err != nil {
 		t.Fatalf("解析认证响应失败: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestClientAuthFail(t *testing.T) {
 		ClientID: "test-client",
 		Token:    "wrong-token",
 	}
-	data, _ := proto.EncodeAuthRequest(authReq)
+	data, _ := proto.Encode(authReq)
 	msg := &proto.Message{
 		Type: proto.TypeAuth,
 		Data: data,
@@ -156,7 +156,7 @@ func TestClientAuthFail(t *testing.T) {
 		t.Fatalf("读取认证响应失败: %v", err)
 	}
 
-	authResp, _ := proto.DecodeAuthResponse(respMsg.Data)
+	authResp, _ := proto.Decode[proto.AuthResponse](respMsg.Data)
 	if authResp.Success {
 		t.Fatal("错误的 Token 应该认证失败")
 	}
@@ -189,7 +189,7 @@ func TestHeartbeat(t *testing.T) {
 		ClientID: "heartbeat-client",
 		Token:    "test-token",
 	}
-	data, _ := proto.EncodeAuthRequest(authReq)
+	data, _ := proto.Encode(authReq)
 	msg := &proto.Message{
 		Type: proto.TypeAuth,
 		Data: data,
@@ -239,7 +239,7 @@ func TestDuplicateClient(t *testing.T) {
 		ClientID: "duplicate-client",
 		Token:    "test-token",
 	}
-	data, _ := proto.EncodeAuthRequest(authReq)
+	data, _ := proto.Encode(authReq)
 	msg := &proto.Message{Type: proto.TypeAuth, Data: data}
 	conn1.WriteMessage(msg)
 	conn1.ReadMessage()
