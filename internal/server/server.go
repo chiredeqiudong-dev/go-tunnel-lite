@@ -19,26 +19,21 @@ import (
 4. 心跳检测
 */
 
-// 服务端
 type Server struct {
-	cfg *config.ServerConfig
-
-	listener   net.Listener
-	sessions   map[string]*ClientSession
-	sessionsMu sync.RWMutex
-
-	stopCh chan struct{}
-	wg     sync.WaitGroup
+	cfg        *config.ServerConfig      // 服务器配置
+	listener   net.Listener              // TCP 监听器
+	sessions   map[string]*ClientSession // 客户端会话映射
+	sessionsMu sync.RWMutex              // 会话映射的读写锁
+	stopCh     chan struct{}             // 停止信号通道
+	wg         sync.WaitGroup            // 等待所有协程退出
 }
 
-// 客户端会话
 type ClientSession struct {
 	clientID   string
-	conn       *connect.Connect
+	conn       *connect.Connect // 控制连接
 	lastActive time.Time
-
-	stopCh chan struct{}
-	mu     sync.Mutex
+	stopCh     chan struct{} // 会话停止信号
+	mu         sync.Mutex
 }
 
 // 创建服务端实例
