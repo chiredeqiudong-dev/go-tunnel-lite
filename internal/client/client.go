@@ -15,20 +15,27 @@ import (
 
 // Client 客户端
 type Client struct {
-	cfg     *config.ClientConfig
-	conn    *connect.Connect // 控制连接
-	stopCh  chan struct{}    // 停止信号
-	wg      sync.WaitGroup   // 等待所有协程退出
-	running bool             // 运行状态
-	mu      sync.Mutex       // 保护 running 状态
+	cfg         *config.ClientConfig
+	conn        *connect.Connect                // 控制连接
+	stopCh      chan struct{}                   // 停止信号
+	wg          sync.WaitGroup                  // 等待所有协程退出
+	running     bool                            // 运行状态
+	mu          sync.Mutex                      // 保护 running 状态
+	tunnelCache map[string]*config.TunnelConfig // 隧道配置缓存
+	processor   *BatchProcessor                 // 消息批量处理器
 }
 
 // NewClient 创建客户端
 func NewClient(cfg *config.ClientConfig) *Client {
-	return &Client{
+	client := &Client{
 		cfg:    cfg,
 		stopCh: make(chan struct{}),
 	}
+
+	// 初始化批量处理器
+	client.processor = NewBatchProcessor(2, 10, client.handleBatchMessages)
+
+	return client
 }
 
 // Start 启动客户端
@@ -40,6 +47,12 @@ func (c *Client) Start() error {
 	}
 	c.running = true
 	c.mu.Unlock()
+
+	// 初始化隧道配置缓存
+	c.tunnelCache = make(map[string]*config.TunnelConfig)
+	for i := range c.cfg.Client.Tunnels {
+		c.tunnelCache[c.cfg.Client.Tunnels[i].Name] = &c.cfg.Client.Tunnels[i]
+	}
 
 	// 连接服务端
 	if err := c.connect(); err != nil {
@@ -57,6 +70,9 @@ func (c *Client) Start() error {
 		c.conn.Close()
 		return err
 	}
+
+	// 启动批量处理器
+	c.processor.Start()
 
 	// 启动消息处理循环
 	c.wg.Add(1)
@@ -87,6 +103,9 @@ func (c *Client) Stop() {
 	if c.conn != nil {
 		c.conn.Close()
 	}
+
+	// 停止批量处理器
+	c.processor.Stop()
 
 	// 等待所有协程退出
 	c.wg.Wait()
@@ -247,12 +266,20 @@ func (c *Client) messageLoop() {
 			}
 		}
 
-		c.handleMessage(msg)
+		// 将消息推送到批量处理器
+		c.processor.Push(msg)
 	}
 }
 
-// handleMessage 处理消息
-func (c *Client) handleMessage(msg *proto.Message) {
+// handleBatchMessages 批量处理消息
+func (c *Client) handleBatchMessages(messages []*proto.Message) {
+	for _, msg := range messages {
+		c.handleSingleMessage(msg)
+	}
+}
+
+// handleSingleMessage 处理单条消息
+func (c *Client) handleSingleMessage(msg *proto.Message) {
 	switch msg.Type {
 	case proto.TypePing:
 		// 收到服务端的 Ping，回复 Pong
@@ -287,16 +314,9 @@ func (c *Client) handleMessage(msg *proto.Message) {
 
 // handleNewProxy 处理新代理连接请求
 func (c *Client) handleNewProxy(req *proto.NewProxyRequest) {
-	// 1. 找到对应的隧道配置
-	var tunnelCfg *config.TunnelConfig
-	for i := range c.cfg.Client.Tunnels {
-		if c.cfg.Client.Tunnels[i].Name == req.TunnelName {
-			tunnelCfg = &c.cfg.Client.Tunnels[i]
-			break
-		}
-	}
-
-	if tunnelCfg == nil {
+	// 1. 从缓存中查找对应的隧道配置
+	tunnelCfg, exists := c.tunnelCache[req.TunnelName]
+	if !exists {
 		log.Error("找不到隧道配置", "tunnelName", req.TunnelName)
 		return
 	}
@@ -346,6 +366,9 @@ func (c *Client) proxyData(local net.Conn, remote net.Conn, proxyID string) {
 	defer local.Close()
 	defer remote.Close()
 
+	// 使用 128KB 缓冲区提高转发效率
+	buf := make([]byte, 128*1024)
+
 	// 使用 WaitGroup 等待两个方向的转发都完成
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -353,14 +376,14 @@ func (c *Client) proxyData(local net.Conn, remote net.Conn, proxyID string) {
 	// local -> remote
 	go func() {
 		defer wg.Done()
-		n, _ := io.Copy(remote, local)
+		n, _ := io.CopyBuffer(remote, local, buf)
 		log.Debug("转发完成", "proxyID", proxyID, "direction", "local->remote", "bytes", n)
 	}()
 
 	// remote -> local
 	go func() {
 		defer wg.Done()
-		n, _ := io.Copy(local, remote)
+		n, _ := io.CopyBuffer(local, remote, buf)
 		log.Debug("转发完成", "proxyID", proxyID, "direction", "remote->local", "bytes", n)
 	}()
 
