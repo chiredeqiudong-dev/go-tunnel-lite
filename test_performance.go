@@ -16,14 +16,15 @@ type MockTunnel struct {
 }
 
 func main() {
-	fmt.Println("=== Go-Tunnel-Lite 性能优化测试报告 ===\n")
+	fmt.Println("=== Go-Tunnel-Lite 性能优化测试报告 ===")
 
 	testTunnelCache()
 	testProtocolEncoding()
 	testMemoryAllocation()
 	testConcurrency()
 
-	fmt.Println("\n=== 测试完成 ===")
+	fmt.Println()
+	fmt.Println("=== 测试完成 ===")
 }
 
 func testTunnelCache() {
