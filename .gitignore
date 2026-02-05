@@ -7,6 +7,10 @@ dist/
 *.so
 *.dylib
 
+# 根目录编译的二进制文件
+client
+server
+
 # 测试二进制文件
 *.test
 

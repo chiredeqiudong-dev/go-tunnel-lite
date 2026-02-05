@@ -27,6 +27,9 @@ type Connect struct {
 
 // 将原生 net.Conn 封装为 Connect
 func WrapConnect(c net.Conn) *Connect {
+	// 应用 TCP 优化参数
+	SetTCPSocketOptions(c)
+
 	return &Connect{
 		conn: c,
 		// reader: bufio.NewReader(c),
