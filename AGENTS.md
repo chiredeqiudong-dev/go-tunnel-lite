@@ -280,6 +280,53 @@ If build fails:
 2. Check Go version compatibility (requires Go 1.25+)
 3. Verify all required files are present
 
+## Project Philosophy: Lightweight & High Performance
+
+This project follows a **minimalist design philosophy** with these core principles:
+
+### Lightweight Principles
+- **Keep it simple**: Avoid over-engineering and unnecessary complexity
+- **Minimal dependencies**: Only use third-party packages when absolutely necessary (currently only `gopkg.in/yaml.v3`)
+- **Single binary**: Compile to a single executable for easy deployment
+- **Small footprint**: Optimize for memory usage and binary size
+- **No bloat features**: Focus on core functionality, avoid feature creep
+
+### High Performance Principles
+- **Performance first**: Prioritize performance over convenience in critical paths
+- **Zero allocation**: Prefer zero-allocation patterns in hot paths
+- **Efficient data structures**: Use maps for O(1) lookups, avoid linear searches
+- **Binary protocols**: Use efficient binary encoding instead of text-based formats
+- **Connection reuse**: Implement connection pooling and keep-alive mechanisms
+- **Batch processing**: Batch operations to reduce overhead
+- **Buffer optimization**: Use appropriately sized buffers to balance memory and performance
+
+### What to Avoid
+❌ **Avoid**: Unnecessary abstractions and indirections
+❌ **Avoid**: Heavy-weight frameworks that add overhead
+❌ **Avoid**: Feature bloat that compromises performance
+❌ **Avoid**: Complex dependency trees
+❌ **Avoid**: Premature optimization without profiling
+❌ **Avoid**: Adding features that can be handled by external tools
+
+### What to Encourage
+✅ **Encourage**: Simple, direct solutions
+✅ **Encourage**: Leverage Go's standard library
+✅ **Encourage**: Write efficient algorithms first
+✅ **Encourage**: Profile and measure performance
+✅ **Encourage**: Keep code readable but fast
+✅ **Encourage**: Remove code that doesn't add value
+✅ **Encourage**: Optimize for the common case
+
+### Decision Framework
+When making design decisions, ask:
+1. **Is it necessary?** Does it solve a real problem?
+2. **Is it simple?** Can it be implemented without complexity?
+3. **Is it performant?** Does it impact critical paths?
+4. **Is it lightweight?** Does it add minimal overhead?
+5. **Can users do without it?** Can external tools handle this?
+
+If the answer to any of these questions is "no", consider removing or simplifying the feature.
+
 ## Notes for AI Agents
 
 - This is a Chinese-developed project with Chinese documentation
@@ -287,3 +334,6 @@ If build fails:
 - Follow existing patterns rather than introducing new conventions
 - When in doubt, look at similar code in the codebase
 - The project aims to be lightweight with minimal dependencies
+- **Always prioritize simplicity and performance over features**
+- **Think twice before adding new features or dependencies**
+- **Less is more: if you can remove code, do it**
