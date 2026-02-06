@@ -375,70 +375,12 @@ If the answer to any of these questions is "no", consider removing or simplifyin
 
 ## Zero-Copy Optimization
 
-### Overview
-The project has implemented zero-copy data forwarding using Linux's `splice(2)` system call through Go's standard `io.Copy` function. This optimization significantly reduces memory allocation and improves performance.
+**Implemented**: Linux splice(2) system call via `io.Copy`
 
-### Key Points
+**Key points**:
+- Use `io.Copy` for socket-to-socket data transfer (zero-copy on Linux)
+- Avoid `io.CopyBuffer` with custom buffers for socket transfers
+- Results: ~80% memory reduction, ~3% performance improvement (Linux)
+- Cross-platform: Falls back to standard copy on Windows/macOS
 
-1. **Use `io.Copy` for Data Forwarding**
-   - Automatically leverages Linux `splice(2)` system call
-   - Transfers data directly between kernel sockets
-   - No user-space memory allocation required
-
-2. **Avoid `io.CopyBuffer` for Socket Transfers**
-   - Custom buffers prevent zero-copy optimizations
-   - Increases memory allocation by ~4x
-   - Only use buffers for non-socket streams
-
-3. **Performance Results** (Linux platform)
-   - Memory allocation: -79.75% (164 KB → 33 KB per operation)
-   - Performance: +3.44% improvement
-   - System calls: ~75% reduction
-
-4. **Cross-Platform Compatibility**
-   - Linux: Uses `splice(2)` for optimal performance
-   - Windows/macOS: Automatically falls back to standard copy
-   - No performance penalty on non-Linux systems
-
-5. **Implementation Pattern**
-```go
-// ✅ Correct: Zero-copy forwarding
-func forwardData(src, dst net.Conn) {
-    go func() {
-        io.Copy(dst, src)  // Uses splice on Linux
-    }()
-    go func() {
-        io.Copy(src, dst)  // Uses splice on Linux
-    }()
-}
-
-// ❌ Avoid: Prevents zero-copy
-func forwardDataWithBuffer(src, dst net.Conn) {
-    buf := make([]byte, 128*1024)
-    go func() {
-        io.CopyBuffer(dst, src, buf)  // No splice optimization
-    }()
-    go func() {
-        io.CopyBuffer(src, dst, buf)  // No splice optimization
-    }()
-}
-```
-
-### Technical Details
-
-**splice(2) System Call**:
-- Allows data to move between two file descriptors without user-space copying
-- Requires Linux kernel 2.6.17 or later
-- Only works with pipes, sockets, and certain file types
-
-**Go Standard Library**:
-- `io.Copy` detects `WriterTo` interface on `*net.TCPConn`
-- Linux TCP connections implement `WriterTo` using `splice(2)`
-- Fallback to standard copy for unsupported types or platforms
-
-### References
-- Implementation: `internal/client/client.go` (proxyData function)
-- Tests: `internal/client/zerocopy_test.go`
-- Server proxy: `internal/server/proxy.go`
-- Performance report: `PERFORMANCE_REPORT.md`
-- Detailed summary: `ZERO_COPY_SUMMARY.md`
+**See**: Data Forwarding section for implementation patterns, `PERFORMANCE_REPORT.md` for details
