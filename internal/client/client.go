@@ -366,24 +366,21 @@ func (c *Client) proxyData(local net.Conn, remote net.Conn, proxyID string) {
 	defer local.Close()
 	defer remote.Close()
 
-	// 使用 128KB 缓冲区提高转发效率
-	buf := make([]byte, 128*1024)
-
 	// 使用 WaitGroup 等待两个方向的转发都完成
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// local -> remote
+	// local -> remote (使用 io.Copy 实现零拷贝)
 	go func() {
 		defer wg.Done()
-		n, _ := io.CopyBuffer(remote, local, buf)
+		n, _ := io.Copy(remote, local)
 		log.Debug("转发完成", "proxyID", proxyID, "direction", "local->remote", "bytes", n)
 	}()
 
-	// remote -> local
+	// remote -> local (使用 io.Copy 实现零拷贝)
 	go func() {
 		defer wg.Done()
-		n, _ := io.CopyBuffer(local, remote, buf)
+		n, _ := io.Copy(local, remote)
 		log.Debug("转发完成", "proxyID", proxyID, "direction", "remote->local", "bytes", n)
 	}()
 
