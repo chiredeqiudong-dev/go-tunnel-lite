@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"encoding/json"
 	"errors"
 )
 
@@ -106,14 +105,12 @@ func GetTypeName(t uint8) string {
 	}
 }
 
-// Encode 将结构体序列化为 JSON 字节
+// Encode 将结构体序列化为二进制字节
 func Encode[T any](v *T) ([]byte, error) {
-	return json.Marshal(v)
+	return EncodeMixed(v)
 }
 
-// Decode 将 JSON 字节反序列化为结构体
+// Decode 将二进制字节反序列化为结构体
 func Decode[T any](data []byte) (*T, error) {
-	v := new(T)
-	err := json.Unmarshal(data, v)
-	return v, err
+	return DecodeMixed[T](data)
 }
