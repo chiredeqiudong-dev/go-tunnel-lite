@@ -28,6 +28,7 @@ type Server struct {
 	wg         sync.WaitGroup            // 等待所有协程退出
 	proxies    map[string]*Proxy         // 隧道代理映射
 	proxiesMu  sync.RWMutex              // 代理映射的读写锁
+	portSet    map[int]bool              // 端口白名单集合（O(1)查找）
 }
 
 type ClientSession struct {
@@ -40,12 +41,20 @@ type ClientSession struct {
 
 // 创建服务端实例
 func NewServer(cfg *config.ServerConfig) *Server {
-	return &Server{
+	server := &Server{
 		cfg:      cfg,
 		sessions: make(map[string]*ClientSession),
 		stopCh:   make(chan struct{}),
 		proxies:  make(map[string]*Proxy),
+		portSet:  make(map[int]bool),
 	}
+
+	// 初始化端口白名单集合
+	for _, port := range cfg.Server.PublicPorts {
+		server.portSet[port] = true
+	}
+
+	return server
 }
 
 // 启动服务端
@@ -305,18 +314,10 @@ func (s *Server) handleRegisterTunnel(session *ClientSession, msg *proto.Message
 // isPortAllowed 检查端口是否在白名单中
 // 如果 public_ports 为空，则允许所有端口
 func (s *Server) isPortAllowed(port int) bool {
-	publicPorts := s.cfg.Server.PublicPorts
-	// 白名单为空，允许所有端口
-	if len(publicPorts) == 0 {
-		return true
+	if len(s.portSet) == 0 {
+		return true // 空白名单允许所有端口
 	}
-	// 检查端口是否在白名单中
-	for _, allowedPort := range publicPorts {
-		if port == allowedPort {
-			return true
-		}
-	}
-	return false
+	return s.portSet[port] // O(1) 查找
 }
 
 // sendRegisterTunnelResponse 发送隧道注册响应
@@ -326,7 +327,11 @@ func (s *Server) sendRegisterTunnelResponse(session *ClientSession, success bool
 		Message:    message,
 		RemotePort: remotePort,
 	}
-	data, _ := proto.Encode(resp)
+	data, err := proto.Encode(resp)
+	if err != nil {
+		log.Error("编码隧道注册响应失败", "error", err)
+		return
+	}
 	msg := &proto.Message{
 		Type: proto.TypeRegisterTunnelResp,
 		Data: data,
@@ -374,7 +379,11 @@ func (s *Server) sendAuthResponse(conn *connect.Connect, success bool, message s
 		Success: success,
 		Message: message,
 	}
-	data, _ := proto.Encode(resp)
+	data, err := proto.Encode(resp)
+	if err != nil {
+		log.Error("编码认证响应失败", "error", err)
+		return
+	}
 	msg := &proto.Message{
 		Type: proto.TypeAuthResp,
 		Data: data,
