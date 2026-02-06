@@ -341,7 +341,13 @@ func (c *Client) handleNewProxy(req *proto.NewProxyRequest) {
 	readyReq := &proto.ProxyReadyRequest{
 		ProxyID: req.ProxyID,
 	}
-	data, _ := proto.Encode(readyReq)
+	data, err := proto.Encode(readyReq)
+	if err != nil {
+		log.Error("编码 ProxyReady 请求失败", "error", err)
+		localConn.Close()
+		dataConn.Close()
+		return
+	}
 	readyMsg := &proto.Message{
 		Type: proto.TypeProxyReady,
 		Data: data,
