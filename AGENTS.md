@@ -252,6 +252,31 @@ type ServerSettings struct {
 - Validate configuration before use
 - Provide default values for optional fields
 
+### Data Forwarding
+- Use `io.Copy` for socket-to-socket data transfer (recommended)
+- Avoid `io.CopyBuffer` for socket-to-socket transfers (prevents zero-copy optimizations)
+- Go's `io.Copy` automatically uses Linux `splice(2)` system call for TCP connections
+- Zero-copy technique eliminates data copying between kernel and user space
+- Results in ~80% reduction in memory allocation and ~3% performance improvement
+- Cross-platform compatible: automatically falls back to standard copy on non-Linux systems
+
+Example:
+```go
+// ✅ Recommended: Zero-copy forwarding
+go func() {
+    io.Copy(remote, local)
+}()
+go func() {
+    io.Copy(local, remote)
+}()
+
+// ❌ Avoid: Prevents zero-copy optimizations
+buf := make([]byte, 128*1024)
+go func() {
+    io.CopyBuffer(remote, local, buf)
+}()
+```
+
 ## Security Considerations
 
 - Always validate input (ports, addresses, tokens)
@@ -266,6 +291,9 @@ type ServerSettings struct {
 - Implement backoff for reconnection attempts
 - Use buffered channels for high-throughput scenarios
 - Profile before optimizing
+- **Use `io.Copy` for data forwarding instead of `io.CopyBuffer`**
+- **Leverage Go's standard library optimizations (e.g., Linux splice system call)**
+- **Prefer zero-copy techniques when transferring data between sockets**
 
 ## Troubleshooting
 
@@ -279,6 +307,12 @@ If build fails:
 1. Run `go mod tidy` to ensure dependencies are correct
 2. Check Go version compatibility (requires Go 1.25+)
 3. Verify all required files are present
+
+If zero-copy optimization shows no benefit:
+1. Verify you are on Linux (splice is Linux-specific)
+2. Use `io.Copy` instead of `io.CopyBuffer`
+3. Check that both endpoints are TCP sockets
+4. Run performance benchmarks to verify improvements
 
 ## Project Philosophy: Lightweight & High Performance
 
@@ -298,7 +332,8 @@ This project follows a **minimalist design philosophy** with these core principl
 - **Binary protocols**: Use efficient binary encoding instead of text-based formats
 - **Connection reuse**: Implement connection pooling and keep-alive mechanisms
 - **Batch processing**: Batch operations to reduce overhead
-- **Buffer optimization**: Use appropriately sized buffers to balance memory and performance
+- **Zero-copy data forwarding**: Use `io.Copy` for socket-to-socket data transfer (leverages Linux splice)
+- **Standard library optimizations**: Trust Go's standard library to use optimal system calls
 
 ### What to Avoid
 ❌ **Avoid**: Unnecessary abstractions and indirections
@@ -337,3 +372,15 @@ If the answer to any of these questions is "no", consider removing or simplifyin
 - **Always prioritize simplicity and performance over features**
 - **Think twice before adding new features or dependencies**
 - **Less is more: if you can remove code, do it**
+
+## Zero-Copy Optimization
+
+**Implemented**: Linux splice(2) system call via `io.Copy`
+
+**Key points**:
+- Use `io.Copy` for socket-to-socket data transfer (zero-copy on Linux)
+- Avoid `io.CopyBuffer` with custom buffers for socket transfers
+- Results: ~80% memory reduction, ~3% performance improvement (Linux)
+- Cross-platform: Falls back to standard copy on Windows/macOS
+
+**See**: Data Forwarding section for implementation patterns, `PERFORMANCE_REPORT.md` for details

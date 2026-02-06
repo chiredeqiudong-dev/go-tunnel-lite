@@ -26,6 +26,8 @@ type Server struct {
 	sessionsMu sync.RWMutex              // 会话映射的读写锁
 	stopCh     chan struct{}             // 停止信号通道
 	wg         sync.WaitGroup            // 等待所有协程退出
+	proxies    map[string]*Proxy         // 隧道代理映射
+	proxiesMu  sync.RWMutex              // 代理映射的读写锁
 }
 
 type ClientSession struct {
@@ -42,6 +44,7 @@ func NewServer(cfg *config.ServerConfig) *Server {
 		cfg:      cfg,
 		sessions: make(map[string]*ClientSession),
 		stopCh:   make(chan struct{}),
+		proxies:  make(map[string]*Proxy),
 	}
 }
 
@@ -81,6 +84,13 @@ func (s *Server) Stop() {
 		session.Close()
 	}
 	s.sessionsMu.Unlock()
+
+	// 停止所有代理
+	s.proxiesMu.Lock()
+	for _, proxy := range s.proxies {
+		proxy.Stop()
+	}
+	s.proxiesMu.Unlock()
 
 	// 等待所有协程退出
 	s.wg.Wait()
@@ -275,8 +285,18 @@ func (s *Server) handleRegisterTunnel(session *ClientSession, msg *proto.Message
 		return
 	}
 
-	// TODO: 实际启动代理监听端口的逻辑
-	// 这里暂时直接返回成功
+	// 创建并启动代理
+	proxy := NewProxy(req.Tunnel.Name, req.Tunnel.RemotePort)
+	if err := proxy.Start(); err != nil {
+		log.Error("启动代理失败", "tunnelName", req.Tunnel.Name, "error", err)
+		s.sendRegisterTunnelResponse(session, false, "启动代理失败", 0)
+		return
+	}
+
+	// 注册代理
+	s.proxiesMu.Lock()
+	s.proxies[req.Tunnel.Name] = proxy
+	s.proxiesMu.Unlock()
 
 	s.sendRegisterTunnelResponse(session, true, "注册成功", req.Tunnel.RemotePort)
 	log.Info("隧道注册成功", "clientID", session.clientID, "tunnelName", req.Tunnel.Name, "remotePort", req.Tunnel.RemotePort)

@@ -2,7 +2,6 @@ package client
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"sync"
 	"time"
@@ -361,34 +360,14 @@ func (c *Client) handleNewProxy(req *proto.NewProxyRequest) {
 	go c.proxyData(localConn, dataConn.RawConn(), req.ProxyID)
 }
 
-// proxyData 双向转发数据
+// proxyData 双向转发数据（优化版本，使用内存池）
 func (c *Client) proxyData(local net.Conn, remote net.Conn, proxyID string) {
-	defer local.Close()
-	defer remote.Close()
+	// 使用内存池管理连接和缓冲区
+	proxyConn := NewProxyConnection(local, remote, proxyID)
+	defer proxyConn.Close()
 
-	// 使用 128KB 缓冲区提高转发效率
-	buf := make([]byte, 128*1024)
-
-	// 使用 WaitGroup 等待两个方向的转发都完成
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	// local -> remote
-	go func() {
-		defer wg.Done()
-		n, _ := io.CopyBuffer(remote, local, buf)
-		log.Debug("转发完成", "proxyID", proxyID, "direction", "local->remote", "bytes", n)
-	}()
-
-	// remote -> local
-	go func() {
-		defer wg.Done()
-		n, _ := io.CopyBuffer(local, remote, buf)
-		log.Debug("转发完成", "proxyID", proxyID, "direction", "remote->local", "bytes", n)
-	}()
-
-	wg.Wait()
-	log.Info("代理连接关闭", "proxyID", proxyID)
+	// 使用共享缓冲区进行双向转发
+	proxyConn.Forward()
 }
 
 // heartbeatLoop 心跳循环
