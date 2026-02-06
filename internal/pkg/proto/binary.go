@@ -45,7 +45,7 @@ var stringBufferPool = sync.Pool{
 // encodeBufferPool 用于重用一般编码缓冲区
 var encodeBufferPool = sync.Pool{
 	New: func() interface{} {
-		return make([]byte, 0, 256) // 预分配256字节容量
+		return make([]byte, 0, 1024) // 预分配1024字节容量
 	},
 }
 
@@ -56,7 +56,7 @@ func encodeString(s string) []byte {
 		length = MaxStringLen
 	}
 
-	// 暂时禁用内存池，避免数据污染
+	// 创建新的缓冲区，避免数据污染
 	data := make([]byte, 2+length)
 	binary.BigEndian.PutUint16(data[0:2], uint16(length))
 	copy(data[2:], s[:length])
@@ -86,15 +86,16 @@ func encodeBool(b bool) []byte {
 	return []byte{0}
 }
 
-// getEncodeBuffer 从内存池获取编码缓冲区（暂时禁用内存池）
+// getEncodeBuffer 从内存池获取编码缓冲区
 func getEncodeBuffer(size int) []byte {
-	// 暂时禁用内存池，避免数据污染问题
+	// 创建新的缓冲区，避免数据污染
 	return make([]byte, size)
 }
 
-// putEncodeBuffer 将编码缓冲区归还到内存池（暂时禁用内存池）
+// putEncodeBuffer 将编码缓冲区归还到内存池
 func putEncodeBuffer(buf []byte) {
-	// 暂时禁用内存池
+	// 暂时不使用内存池，避免数据污染问题
+	// encodeBufferPool.Put(buf)
 }
 
 // decodeBool 解码布尔值
