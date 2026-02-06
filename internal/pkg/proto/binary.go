@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"sync"
 )
 
 // BinaryEncoder 二进制编码器接口
@@ -34,6 +35,20 @@ var (
 	ErrStringTooLong = errors.New("proto: string too long")
 )
 
+// stringBufferPool 用于重用字符串编码缓冲区
+var stringBufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 0, 128) // 预分配128字节容量
+	},
+}
+
+// encodeBufferPool 用于重用一般编码缓冲区
+var encodeBufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 0, 256) // 预分配256字节容量
+	},
+}
+
 // encodeString 编码字符串（长度前缀）
 func encodeString(s string) []byte {
 	length := len(s)
@@ -41,9 +56,11 @@ func encodeString(s string) []byte {
 		length = MaxStringLen
 	}
 
+	// 暂时禁用内存池，避免数据污染
 	data := make([]byte, 2+length)
 	binary.BigEndian.PutUint16(data[0:2], uint16(length))
 	copy(data[2:], s[:length])
+
 	return data
 }
 
@@ -69,6 +86,17 @@ func encodeBool(b bool) []byte {
 	return []byte{0}
 }
 
+// getEncodeBuffer 从内存池获取编码缓冲区（暂时禁用内存池）
+func getEncodeBuffer(size int) []byte {
+	// 暂时禁用内存池，避免数据污染问题
+	return make([]byte, size)
+}
+
+// putEncodeBuffer 将编码缓冲区归还到内存池（暂时禁用内存池）
+func putEncodeBuffer(buf []byte) {
+	// 暂时禁用内存池
+}
+
 // decodeBool 解码布尔值
 func decodeBool(data []byte) (bool, error) {
 	if len(data) < 1 {
@@ -85,7 +113,10 @@ func (r *AuthRequest) EncodeBinary() ([]byte, error) {
 
 	// 计算总长度
 	totalLen := len(clientIDData) + len(tokenData) + len(versionData)
-	data := make([]byte, totalLen)
+
+	// 从内存池获取缓冲区
+	data := getEncodeBuffer(totalLen)
+	defer putEncodeBuffer(data)
 
 	// 拼接数据
 	offset := 0
@@ -129,7 +160,10 @@ func (r *AuthResponse) EncodeBinary() ([]byte, error) {
 	messageData := encodeString(r.Message)
 
 	totalLen := len(successData) + len(messageData)
-	data := make([]byte, totalLen)
+
+	// 从内存池获取缓冲区
+	data := getEncodeBuffer(totalLen)
+	defer putEncodeBuffer(data)
 
 	offset := 0
 	copy(data[offset:], successData)
@@ -165,7 +199,10 @@ func (t *TunnelConfig) EncodeBinary() ([]byte, error) {
 	binary.BigEndian.PutUint32(remotePortData, uint32(t.RemotePort))
 
 	totalLen := len(nameData) + len(typeData) + len(localAddrData) + len(remotePortData)
-	data := make([]byte, totalLen)
+
+	// 从内存池获取缓冲区
+	data := getEncodeBuffer(totalLen)
+	defer putEncodeBuffer(data)
 
 	offset := 0
 	copy(data[offset:], nameData)

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"sync"
 )
 
 /*
@@ -13,6 +14,13 @@ Message 结构体、编解码方法
 | 1字节 | 4字节  |  N字节   |
 +------+--------+---------+
 */
+
+// headerPool 用于重用消息头缓冲区，减少内存分配
+var headerPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, HeaderLen)
+	},
+}
 
 // Message
 type Message struct {
@@ -28,8 +36,10 @@ func (m *Message) WriteTo(w io.Writer) (n int64, err error) {
 		return 0, ErrMsgTooLarge
 	}
 
-	// 构造消息头
-	header := make([]byte, HeaderLen)
+	// 从内存池获取消息头
+	header := headerPool.Get().([]byte)
+	defer headerPool.Put(header)
+
 	// 第1字节 数据类型，2-5字节 数据长度（大端序）
 	header[0] = m.Type
 	binary.BigEndian.PutUint32(header[1:5], uint32(dataLen))
@@ -56,8 +66,10 @@ func (m *Message) WriteTo(w io.Writer) (n int64, err error) {
 
 // 对 Message 按照已经定义好的协议进行解码
 func (m *Message) ReadFrom(r io.Reader) (n int64, err error) {
-	// 读取消息头
-	header := make([]byte, HeaderLen)
+	// 从内存池获取消息头
+	header := headerPool.Get().([]byte)
+	defer headerPool.Put(header)
+
 	readN, err := io.ReadFull(r, header)
 	n = int64(readN)
 	if err != nil {
